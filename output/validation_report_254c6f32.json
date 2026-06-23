@@ -1,0 +1,306 @@
+{
+  "doc_id": "254c6f32",
+  "sector": "Rail Infrastructure",
+  "generated_at": "2026-06-21T11:51:46.549487",
+  "kg_stats": {
+    "entities": 0,
+    "triples": 0,
+    "concepts": 5
+  },
+  "score": {
+    "weighted_score": 68.2,
+    "verdict": "NEEDS IMPROVEMENT",
+    "total_checks": 21,
+    "compliant_count": 5,
+    "marginal_count": 0,
+    "non_compliant_count": 2,
+    "needs_review_count": 14,
+    "compliant_weight": 15,
+    "non_compliant_weight": 7,
+    "total_weight": 22,
+    "by_severity": {
+      "CRITICAL": {
+        "total": 7,
+        "compliant": 0,
+        "marginal": 0,
+        "non_compliant": 1,
+        "needs_review": 6,
+        "weight": 4,
+        "compliant_weight": 0
+      },
+      "HIGH": {
+        "total": 14,
+        "compliant": 5,
+        "marginal": 0,
+        "non_compliant": 1,
+        "needs_review": 8,
+        "weight": 18,
+        "compliant_weight": 15
+      }
+    },
+    "by_category": {
+      "RITES DPR Appraisal Tool": {
+        "total": 21,
+        "compliant": 5,
+        "marginal": 0,
+        "non_compliant": 2,
+        "needs_review": 14,
+        "category_score": 71.4
+      }
+    }
+  },
+  "results": [
+    {
+      "classification": "Non-Compliant",
+      "check_area": "Ruling Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "3440 m",
+      "rule_expected": "no more than 1:100",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "DPR reports ruling gradient length as 3440m, exceeding the standard limit of 1:100; must be corrected for safety reasons.",
+      "source_page": 11
+    },
+    {
+      "classification": "Non-Compliant",
+      "check_area": "Formation Width",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "7.85 m",
+      "rule_expected": "at least 13.15 m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "Formation width reported at 7.85m, below required minimum of 13.15m; needs adjustment to meet standard requirements.",
+      "source_page": 34
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "1in200",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for ruling gradient is '1in200'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 11
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "3440 m",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for length on ruling gradient is '3440 m'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 11
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "4000 m",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for maximum_gradient_length_in_one_stretch is '4000 m'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 33
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "150",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for maximum_approach_gradient_to_main_river_bridge is '150'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 33
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "1in400",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for maximum gradient is '1in400'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 34
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "1in1200",
+      "rule_expected": "exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "CRITICAL",
+      "weight": 4,
+      "reason": "The DPR value for recommended gradient is '1in1200'. The rule requires exactly Ruling gradient 1:100 (compensated); approach to river 1:150; station/yards 1:1200 or maximum 400 per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 34
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Minimum Formation Width",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "7.8 m",
+      "rule_expected": "at least 7.85 m for single line; 13.15 m for double line m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR value for width is '7.8 m'. The rule requires at least 7.85 m for single line; 13.15 m for double line m per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 12
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Minimum Formation Width",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "5.3 m",
+      "rule_expected": "at least 7.85 m for single line; 13.15 m for double line m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR value for width is '5.3 m'. The rule requires at least 7.85 m for single line; 13.15 m for double line m per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 12
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Minimum Formation Width",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "100 m",
+      "rule_expected": "at least 7.85 m for single line; 13.15 m for double line m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR value for width is '100 m'. The rule requires at least 7.85 m for single line; 13.15 m for double line m per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 258
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Minimum Formation Width",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "3 m",
+      "rule_expected": "at least 7.85 m for single line; 13.15 m for double line m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR value for width is '3 m'. The rule requires at least 7.85 m for single line; 13.15 m for double line m per RITES DPR Appraisal Tool . This could not be verified automatically and needs review.",
+      "source_page": 258
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Track Km (Tkm)",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "414620 m",
+      "rule_expected": "no more than 1.2 × RKm (doubling project); 2.4 × RKm (3rd and 4th line)",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR contains a semantically similar parameter 'length (total track km)' (similarity=0.82 to rule attribute 'Track Km (TKm)'), but the value could not be automatically compared. Manual review needed for RITES DPR Appraisal Tool .",
+      "source_page": 13
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Track Centre Spacing",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "7.8 m",
+      "rule_expected": "within range Minimum 5.3 m (for doubling); minimum 7.8 m for 3rd line and 5.3 m for 4th line from 3rd line m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR contains a semantically similar parameter 'width (track center)' (similarity=0.87 to rule attribute 'Track Centre Spacing'), but the value could not be automatically compared. Manual review needed for RITES DPR Appraisal Tool .",
+      "source_page": 12
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Design Loading (Bridges)",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "25TLoadingStandard",
+      "rule_expected": "exactly Sub-structure: 25T loading; Super-structure: 25T loading",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR contains a semantically similar parameter 'loading standard (bridges)' (similarity=0.87 to rule attribute 'Design Loading (Bridges)'), but the value could not be automatically compared. Manual review needed for RITES DPR Appraisal Tool .",
+      "source_page": 42
+    },
+    {
+      "classification": "Needs Review",
+      "check_area": "Track Centre Spacing",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "7.8 m",
+      "rule_expected": "within range 5.3 m",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR contains a semantically similar parameter 'width (track center)' (similarity=0.87 to rule attribute 'track centre spacing'), but the value could not be automatically compared. Manual review needed for RITES DPR Appraisal Tool .",
+      "source_page": 12
+    },
+    {
+      "classification": "Compliant",
+      "check_area": "Ruling Gradient",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "1in200",
+      "rule_expected": "no more than 1:100",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR reports ruling gradient as 1in200, which meets the requirement of no more than 1:100 per RITES DPR Appraisal Tool .",
+      "source_page": 11
+    },
+    {
+      "classification": "Compliant",
+      "check_area": "Design Speed",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "160 km/h",
+      "rule_expected": "exactly 160 kmph",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR reports design speed as 160 km/h, which meets the requirement of exactly 160 kmph per RITES DPR Appraisal Tool .",
+      "source_page": 237
+    },
+    {
+      "classification": "Compliant",
+      "check_area": "Design Speed",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "160 km/h",
+      "rule_expected": "exactly 160 kmph",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR reports design speed as 160 km/h, which meets the requirement of exactly 160 kmph per RITES DPR Appraisal Tool .",
+      "source_page": 237
+    },
+    {
+      "classification": "Compliant",
+      "check_area": "Design Axle Load",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "25-T",
+      "rule_expected": "exactly 25 tons axle load standard",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR reports axle loading as 25-T, which meets the requirement of exactly 25 tons axle load standard per RITES DPR Appraisal Tool . (Matched semantically, similarity=0.85)",
+      "source_page": 12
+    },
+    {
+      "classification": "Compliant",
+      "check_area": "Design Axle Load",
+      "category": "RITES DPR Appraisal Tool",
+      "dpr_value": "25-T",
+      "rule_expected": "exactly 25 tons",
+      "standard": "RITES DPR Appraisal Tool",
+      "severity": "HIGH",
+      "weight": 3,
+      "reason": "The DPR reports axle loading as 25-T, which meets the requirement of exactly 25 tons per RITES DPR Appraisal Tool . (Matched semantically, similarity=0.85)",
+      "source_page": 12
+    }
+  ]
+}

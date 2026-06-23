@@ -26,6 +26,7 @@ tiktoken>=0.7.0
  
 # Data handling
 json-repair>=0.25.0
+faiss-cpu>=1.8.0          # semantic fact<->rule matching + KG FAISS index
 pydantic>=2.7.0
 pandas>=2.2.0
 numpy>=1.26.0

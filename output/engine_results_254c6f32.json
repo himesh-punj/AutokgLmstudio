@@ -1,0 +1,246 @@
+{
+  "doc_id": "254c6f32",
+  "sector": "Rail Infrastructure",
+  "consistency": {
+    "doc_id": "254c6f32",
+    "sector": "Rail Infrastructure",
+    "total_issues": 8,
+    "by_severity": {
+      "CRITICAL": 1,
+      "HIGH": 4,
+      "MEDIUM": 2,
+      "LOW": 1
+    },
+    "by_type": {
+      "numeric_mismatch": 1,
+      "missing_dependency": 2,
+      "llm_flagged": 5
+    },
+    "issues": [
+      {
+        "id": "18d52af0-b7a9-4f54-b8a0-50f9c8bd5df9",
+        "type": "numeric_mismatch",
+        "severity": "HIGH",
+        "description": "'project \u2192 total cost' has inconsistent values across pages: [5470.57, 5470.57, 4220.16, 303.26, 6.29] (diff=100%)",
+        "pages": [
+          11,
+          14,
+          16,
+          48,
+          49,
+          347,
+          493
+        ],
+        "evidence": "Values found: [5470.57, 5470.57, 4220.16, 303.26, 6.29]"
+      },
+      {
+        "id": "531bc3fb-2516-4e7c-a7ed-bbe0b8799acd",
+        "type": "missing_dependency",
+        "severity": "HIGH",
+        "description": "'gradient' is specified in the DPR but its prerequisite 'ruling gradient length' is not found.",
+        "pages": [
+          34,
+          35,
+          12
+        ],
+        "evidence": "Dependency: Gradient impacts the power requirements for locomotives.. Expected check: If ruling gradient < 1:200, then length on ruling gradient >= 500 m"
+      },
+      {
+        "id": "5f160a00-a42f-422c-85be-cebe3c78b58b",
+        "type": "missing_dependency",
+        "severity": "HIGH",
+        "description": "'track curvature' is specified in the DPR but its prerequisite 'maximum speed limit' is not found.",
+        "pages": [
+          12
+        ],
+        "evidence": "Dependency: Curvature affects train stability and safety.. Expected check: If degree of curvature > 5, then max speed <= 100 km/h"
+      },
+      {
+        "id": "9406572a-af5b-4598-9cdd-3a7a9d6b62bf",
+        "type": "llm_flagged",
+        "severity": "CRITICAL",
+        "description": "Multiple total cost values for the project.",
+        "pages": [],
+        "evidence": "[p11: project | total cost = 5470.57 crore Rs., p14: project | total cost = 5470.57 crore Rs., p16: project | total cost = 303.26 crore Rs., p16: project | total cost = 6.29 crore Rs., p16: project | total cost = 8.63 crore Rs., p16: project | total cost = 5.25 crore Rs.]"
+      },
+      {
+        "id": "5e265622-46cd-4307-8c6f-49aa6d1d0675",
+        "type": "llm_flagged",
+        "severity": "HIGH",
+        "description": "Different track center widths.",
+        "pages": [],
+        "evidence": "[p13: track center | width = 7.8 m, p13: track center | width = 5.3 m]"
+      },
+      {
+        "id": "398a0967-2106-4b4b-9a52-0cd6c6504807",
+        "type": "llm_flagged",
+        "severity": "MEDIUM",
+        "description": "Multiple railway section lengths.",
+        "pages": [],
+        "evidence": "[p32: railway section | length = 198000 m, p32: railway section | length = 193600 m]"
+      },
+      {
+        "id": "07e7b5e1-c5f6-4f1a-9613-eca25fd7b754",
+        "type": "llm_flagged",
+        "severity": "LOW",
+        "description": "Different track curvature degree of curvature.",
+        "pages": [],
+        "evidence": "[p12: track curvature | degree of curvature = 3, p34: track geometry | maximum_degree_of_curvature = 3 degrees]"
+      },
+      {
+        "id": "7346a512-6a70-4b5d-8978-12dfa83da294",
+        "type": "llm_flagged",
+        "severity": "MEDIUM",
+        "description": "Multiple track center distances.",
+        "pages": [],
+        "evidence": "[p36: track center | distance = 6.1 m, p36: track center | distance = 5.3 m]"
+      }
+    ]
+  },
+  "anomaly": {
+    "doc_id": "254c6f32",
+    "sector": "Rail Infrastructure",
+    "total_flags": 14,
+    "by_type": {
+      "statistical_outlier": 2,
+      "oom_error": 6,
+      "duplicate_values": 0,
+      "unit_mismatch": 1,
+      "llm_flagged": 5
+    },
+    "by_severity": {
+      "CRITICAL": 0,
+      "HIGH": 9,
+      "MEDIUM": 5,
+      "LOW": 0
+    },
+    "flags": [
+      {
+        "id": "99509b6d-6326-45dd-98e5-c98cdf89b420",
+        "type": "statistical_outlier",
+        "severity": "MEDIUM",
+        "description": "'total cost' value 547057.0 crore Rs. is a statistical outlier (z=4.0, mean=32181.92, \u03c3=128520.26)",
+        "attribute": "total cost",
+        "flagged_value": "547057.0",
+        "expected_range": "-224858.59 \u2013 289222.44"
+      },
+      {
+        "id": "b59a6e99-da56-4979-a94e-94d451493198",
+        "type": "statistical_outlier",
+        "severity": "MEDIUM",
+        "description": "'quantity' value 837894.0 m\u00b3 is a statistical outlier (z=3.2, mean=69826.12, \u03c3=241878.65)",
+        "attribute": "quantity",
+        "flagged_value": "837894.0",
+        "expected_range": "-413931.18 \u2013 553583.43"
+      },
+      {
+        "id": "9b4b993d-3ae7-465a-bce9-bd522d349df6",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'ruling gradient' value 1200.0  appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "ruling gradient",
+        "flagged_value": "1200.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "81e7713d-d58e-45f1-9f3a-780275d58536",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'length on ruling gradient' value 3440.0 m appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "length on ruling gradient",
+        "flagged_value": "3440.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "035e82f0-32bd-44a0-8d0e-7e91b2fccc66",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'maximum_gradient_length_in_one_stretch' value 4000.0 m appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "maximum_gradient_length_in_one_stretch",
+        "flagged_value": "4000.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "f46e937c-dd9c-49b4-b197-fa4b3ae2130d",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'maximum_approach_gradient_to_main_river_bridge' value 150.0  appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "maximum_approach_gradient_to_main_river_bridge",
+        "flagged_value": "150.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "148f2e1b-c9c4-42fa-8c71-bccb6a7e6531",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'maximum gradient' value 1400.0  appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "maximum gradient",
+        "flagged_value": "1400.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "2519f76a-7ecd-47d7-9c7c-d574a43c0c23",
+        "type": "oom_error",
+        "severity": "HIGH",
+        "description": "'recommended gradient' value 11200.0  appears to be an order-of-magnitude error. Expected range: 0.1\u201310 %. Possible decimal placement mistake?",
+        "attribute": "recommended gradient",
+        "flagged_value": "11200.0",
+        "expected_range": "0.1\u201310 %"
+      },
+      {
+        "id": "29bd3363-c011-4ca3-b602-2c5d2a982e4e",
+        "type": "unit_mismatch",
+        "severity": "MEDIUM",
+        "description": "'depth' uses mixed units: {'mm', 'm'}. Verify all values are on the same scale.",
+        "attribute": "depth",
+        "flagged_value": "{'mm', 'm'}",
+        "expected_range": ""
+      },
+      {
+        "id": "c6534c03-9261-42a8-9f17-be0f354a2d0c",
+        "type": "llm_flagged",
+        "severity": "HIGH",
+        "description": "Multiple total cost entries with different values.",
+        "attribute": "total cost",
+        "flagged_value": "[5470.57, 5982.69, 4220.16, 303.26, 6.29, 8.63, 5.25, 30.21, 41.4, 20.58, 41.34, 168.69, 15.82, 3.16]",
+        "expected_range": "There are multiple total cost entries with significantly different values which is unusual and could indicate data entry errors or fraudulent activities."
+      },
+      {
+        "id": "51ba07e0-1305-4170-9eff-3bc99c8880fa",
+        "type": "llm_flagged",
+        "severity": "HIGH",
+        "description": "Inconsistent width measurements for track center.",
+        "attribute": "width",
+        "flagged_value": "[7.8, 5.3]",
+        "expected_range": "The track center width varies between two different values which is physically impossible and suggests data entry errors or inconsistencies in the DPR documentation."
+      },
+      {
+        "id": "a66565d4-1595-467f-978f-1f17c55f0af2",
+        "type": "llm_flagged",
+        "severity": "HIGH",
+        "description": "Inconsistent length measurements for railway section.",
+        "attribute": "length",
+        "flagged_value": "[198000, 193600]",
+        "expected_range": "The railway section length is inconsistently reported with two different values which indicates data entry errors or discrepancies in the DPR documentation."
+      },
+      {
+        "id": "c8a6f467-0b2b-441f-b01c-5a7032c74b88",
+        "type": "llm_flagged",
+        "severity": "MEDIUM",
+        "description": "Inconsistent distance measurements for track center.",
+        "attribute": "distance",
+        "flagged_value": "[5.3, 6.1]",
+        "expected_range": "The track center distance varies between two different values which is unusual and suggests data entry errors or inconsistencies in the DPR documentation."
+      },
+      {
+        "id": "34f0be99-109e-4a1f-8d19-0fad5e776f8f",
+        "type": "llm_flagged",
+        "severity": "MEDIUM",
+        "description": "Inconsistent height measurements for elevation.",
+        "attribute": "height",
+        "flagged_value": "[243, 293]",
+        "expected_range": "The elevation heights are inconsistent with two different values which is unusual and suggests data entry errors or inconsistencies in the DPR documentation."
+      }
+    ]
+  }
+}

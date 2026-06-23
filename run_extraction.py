@@ -85,6 +85,8 @@ Override examples:
     p.add_argument("--workers",    type=int,  default=None, help=f"Override workers (default: {EXTRACTION_WORKERS})")
     p.add_argument("--skip-tables", action="store_true")
     p.add_argument("--skip-facts",  action="store_true")
+    p.add_argument("--fast", action="store_true",
+                   help="Skip the slow vision-LLM table fallback (faster; pdfplumber/camelot only)")
     return p.parse_args()
 
 
@@ -145,7 +147,7 @@ def _has_extractable_content(text: str) -> bool:
     return True
 
 
-def _process_page(page, doc_id, sector, dpr_path, skip_facts, skip_tables, clf):
+def _process_page(page, doc_id, sector, dpr_path, skip_facts, skip_tables, clf, use_vision=True):
     cat    = clf.category
     facts  = []
     tables = []
@@ -159,12 +161,14 @@ def _process_page(page, doc_id, sector, dpr_path, skip_facts, skip_tables, clf):
                 for f in facts:
                     f["doc_id"]      = doc_id
                     f["source_page"] = page.page_num + 1
+                    f["printed_page"] = page.printed_page  # printed DPR page no. (may be None)
 
         if not skip_tables and cat in (PageCategory.TABLE, PageCategory.MIXED):
             tables = extract_tables_from_page(
                 pdf_path=dpr_path,
                 page_num=page.page_num,
                 context=f"{sector} DPR page {page.page_num + 1}",
+                use_vision=use_vision,
             )
 
         # IMAGE pages: vision model (llama3.2-vision) skipped if unsupported
@@ -191,6 +195,7 @@ def extract_dpr(
     workers: int = None,
     skip_facts: bool = False,
     skip_tables: bool = False,
+    use_vision: bool = True,
 ) -> dict:
 
     doc_id    = doc_id or str(uuid.uuid4())[:8]
@@ -252,7 +257,8 @@ def extract_dpr(
         with ThreadPoolExecutor(max_workers=n_workers) as ex:
             futures = {
                 ex.submit(_process_page, page, doc_id, sector, dpr_path,
-                          skip_facts, skip_tables, classifications[page.page_num]): page.page_num
+                          skip_facts, skip_tables, classifications[page.page_num],
+                          use_vision): page.page_num
                 for page in pages_active
             }
             for future in as_completed(futures):
@@ -263,6 +269,10 @@ def extract_dpr(
                 all_facts.extend(r["facts"])
                 if r["table_rows"]:
                     all_tables[str(r["page_num"] + 1)] = r["table_rows"]
+
+    # Release the per-thread pdfplumber handles opened during table extraction.
+    from extractors.table_extractor import close_cached_pdfs
+    close_cached_pdfs()
 
     save_json(all_facts,  doc_dir / "facts_raw.json")
     save_json(all_tables, doc_dir / "tables_raw.json")
@@ -405,6 +415,7 @@ def scan_and_extract_all(args) -> dict:
             workers=args.workers,
             skip_facts=args.skip_facts,
             skip_tables=args.skip_tables,
+            use_vision=not args.fast,
         )
         results["dpr"] = r
         # Only process first DPR in auto mode — subsequent DPRs need separate runs
@@ -453,6 +464,7 @@ def main():
                 workers=args.workers,
                 skip_facts=args.skip_facts,
                 skip_tables=args.skip_tables,
+                use_vision=not args.fast,
             )
 
     # ── Auto folder scan mode (no flags given)

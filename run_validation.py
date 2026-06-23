@@ -97,7 +97,9 @@ def print_report(report: dict):
         border_style=vc.replace("bold ", ""),
         subtitle=(
             f"[dim]Compliant: {score.get('compliant_count',0)}  |  "
+            f"Marginal: {score.get('marginal_count',0)}  |  "
             f"Non-Compliant: {score.get('non_compliant_count',0)}  |  "
+            f"Needs Review: {score.get('needs_review_count',0)}  |  "
             f"Total checks: {score.get('total_checks',0)}[/dim]"
         ),
     ))
@@ -162,11 +164,25 @@ def print_report(report: dict):
     results = report.get("results", [])
     if results:
         non_comp = [r for r in results if r["classification"] == "Non-Compliant"]
+        marginal = [r for r in results if r["classification"] == "Marginal"]
+        review   = [r for r in results if r["classification"] == "Needs Review"]
         comp     = [r for r in results if r["classification"] == "Compliant"]
 
         if non_comp:
             console.print(f"\n[bold red]Non-Compliant Checks ({len(non_comp)}):[/bold red]")
             _print_results_table(non_comp, border_color="red")
+
+        if marginal:
+            console.print(f"\n[bold yellow]Marginal — near-miss within tolerance ({len(marginal)}):[/bold yellow] "
+                          f"[dim](counted as compliant, flagged for confirmation)[/dim]")
+            _print_results_table(marginal, border_color="yellow")
+
+        if review:
+            console.print(f"\n[bold yellow]Needs Review ({len(review)}):[/bold yellow] "
+                          f"[dim](not counted in score — ambiguous/un-parseable thresholds)[/dim]")
+            _print_results_table(review[:20], border_color="yellow")
+            if len(review) > 20:
+                console.print(f"[dim]  ... and {len(review) - 20} more needing review.[/dim]")
 
         if comp:
             console.print(f"\n[bold green]Compliant Checks ({len(comp)}):[/bold green]")
@@ -197,7 +213,7 @@ def _print_results_table(rows: list[dict], border_color: str):
 
     for r in rows:
         cls        = r["classification"]
-        cls_color  = "green" if cls == "Compliant" else "red"
+        cls_color  = {"Compliant": "green", "Non-Compliant": "red", "Marginal": "yellow"}.get(cls, "yellow")
         sev        = r.get("severity", "")
         sc         = sev_color_map.get(sev, "white")
         pg         = str(r.get("source_page", "")) or "—"
