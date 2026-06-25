@@ -387,6 +387,7 @@ def push_facts(facts: list[dict], sector: str, dry_run: bool) -> int:
                 f.confidence  = $confidence,
                 f.source_page = $page,
                 f.printed_page = $printed_page,
+                f.nature      = $nature,
                 f.sector      = $sector,
                 f.doc_id      = $doc_id
             MERGE (d)-[:{RelType.HAS_FACT}]->(f)
@@ -406,6 +407,7 @@ def push_facts(facts: list[dict], sector: str, dry_run: bool) -> int:
                 "confidence":  float(fact.get("confidence", 0.5)),
                 "page":        int(fact.get("source_page", 0)),
                 "printed_page": fact.get("printed_page"),
+                "nature":      fact.get("nature", "proposed"),
                 "sector":      fact_sector,
                 "sector_name": fact_sector,
             }

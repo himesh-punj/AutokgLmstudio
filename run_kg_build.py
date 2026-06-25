@@ -379,22 +379,22 @@ def main():
                 sys.exit(1)
         else:
             rb_meta  = load_metadata(rulebook_id)
-            rb_file  = rb_meta.get("filename", "")
             rb_sector = rb_meta.get("sector", "Rail Infrastructure")
 
-            console.rule("[bold cyan]Building KG from Rulebook[/bold cyan]")
+            console.rule("[bold cyan]Building Rule Knowledge Graph[/bold cyan]")
             console.print(
-                "This builds structured triples from the rulebook text.\n"
-                "These triples represent WHAT IS REQUIRED — the rule knowledge graph.\n"
-                "DPR facts will be validated against this graph.\n"
+                "Building the KG DETERMINISTICALLY from the structured rules (no LLM).\n"
+                "Shape:  (rulebook) -[contains parameter]-> (parameter) -[constraint]-> (value)\n"
+                "e.g.    (RITES…) -[contains parameter]-> (Design Axle Load) -[must be at least]-> (25 tons)\n"
             )
 
-            rb_stats = build_kg_for_doc(
-                doc_id=rulebook_id,
-                filename=rb_file,
-                sector=rb_sector,
-                is_rulebook=True,
-                args=args,
+            from extractors.rule_graph_builder import build_rule_graph
+            rb_stats = build_rule_graph(rulebook_id, sector=rb_sector, clear=True)
+            console.print(
+                f"   Parameters: [green]{rb_stats['parameters']}[/green]   "
+                f"Values: [green]{rb_stats['values']}[/green]   "
+                f"Categories: [green]{rb_stats.get('categories', 0)}[/green]   "
+                f"Edges: [green]{rb_stats['triples']}[/green]"
             )
             kg_stats["rulebook"] = rb_stats
 

@@ -23,6 +23,7 @@ Next step: python run_push.py
 """
 
 import sys
+import re
 import argparse
 import uuid
 import json
@@ -128,23 +129,61 @@ def _should_use_fast_model(text: str) -> bool:
     return numeric_hits < 3  # few engineering values → fast model ok
 
 
+# Engineering signal: a value with an engineering unit, or an engineering keyword.
+_UNIT_VALUE_RE = re.compile(
+    r'\d+\.?\d*\s*(?:mm|cm|m|km|kmph|km/h|%|kg|t|tonne|tonnes|mpa|kpa|kn|cum|sqm|ha|'
+    r'rs\.?|crore|lakh|nos?|degree)\b', re.I,
+)
+_ENG_KEYWORD_RE = re.compile(
+    r'\b(gradient|gauge|speed|width|span|depth|height|radius|curve|curvature|capacity|'
+    r'cost|load|axle|formation|ballast|sleeper|platform|alignment|embankment|cutting|'
+    r'bridge|tunnel|station|signal|traction|rail|track|carriageway|foundation|pier|deck)\b',
+    re.I,
+)
+
+
 def _has_extractable_content(text: str) -> bool:
     """
     Quick pre-filter: does this page have enough signal for the LLM?
-    Saves LLM calls on pages that will return [] anyway.
+    Saves LLM calls on pages that would return [] anyway. A page must have:
+      - >= 80 chars and >= 3 non-empty lines (not a header/title page), AND
+      - an engineering signal: a value-with-unit OR an engineering keyword
+        (skips narrative pages whose only numbers are years/clauses/page refs).
     """
-    import re as _re
     if not text or len(text.strip()) < 80:
         return False
-    # Must have at least one numeric value
-    has_numbers = bool(_re.search(r'\d+\.?\d*', text))
-    if not has_numbers:
-        return False
-    # Must not be pure header/title page
     lines = [l.strip() for l in text.split('\n') if l.strip()]
     if len(lines) < 3:
         return False
+    if not (_UNIT_VALUE_RE.search(text) or _ENG_KEYWORD_RE.search(text)):
+        return False
     return True
+
+
+def _free_vram_for_vision():
+    """
+    Free VRAM for the GLM-OCR vision phase, in order: unload Ollama text/embed
+    models, then LM Studio. GLM-OCR then loads fresh into a clean GPU. Best-effort.
+    """
+    import os, subprocess
+    # 1. unload any resident Ollama models (keep glm-ocr — it's what we're about to use)
+    try:
+        import ollama
+        for m in ollama.ps().get("models", []):
+            name = m.get("model") or m.get("name") or ""
+            if name and "glm-ocr" not in name:
+                subprocess.run(["ollama", "stop", name], capture_output=True, timeout=20)
+    except Exception:
+        pass
+    # 2. unload LM Studio
+    lms = os.path.expanduser(os.path.join("~", ".lmstudio", "bin", "lms.exe"))
+    if not os.path.exists(lms):
+        lms = "lms"
+    try:
+        subprocess.run([lms, "unload", "--all"], capture_output=True, timeout=30)
+    except Exception:
+        pass
+    console.print("[dim]Freed VRAM (Ollama text/embed + LM Studio unloaded) for vision OCR.[/dim]")
 
 
 def _process_page(page, doc_id, sector, dpr_path, skip_facts, skip_tables, clf, use_vision=True):
@@ -180,8 +219,14 @@ def _process_page(page, doc_id, sector, dpr_path, skip_facts, skip_tables, clf, 
     except Exception as e:
         logger.warning(f"Page {page.page_num + 1}: {e}")
 
+    # In deferred mode (use_vision=False) a table page that yielded nothing from
+    # pdfplumber/camelot is queued for the GLM-OCR vision phase (run after the
+    # LM Studio text work, so the two models never share VRAM).
+    needs_vision = (not use_vision and not skip_tables
+                    and cat in (PageCategory.TABLE, PageCategory.MIXED) and not tables)
+
     return {"page_num": page.page_num, "category": cat.value,
-            "facts": facts, "table_rows": tables}
+            "facts": facts, "table_rows": tables, "needs_vision": needs_vision}
 
 
 # ─── DPR extraction ───────────────────────────────────────────────────────────
@@ -245,20 +290,22 @@ def extract_dpr(
         "doc_kind": "dpr", "workers": n_workers,
     }, doc_dir / "metadata.json")
 
-    # Parallel extraction
+    # ── Phase 1: text/facts + fast tables (pdfplumber/camelot). Vision is DEFERRED
+    # so the LM Studio (Qwen) text work and the GLM-OCR vision work never share VRAM.
     all_facts  = []
     all_tables = {}
+    deferred_vision = []   # page_nums whose table needs GLM-OCR
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"),
                   BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
                   console=console) as prog:
-        task = prog.add_task("Extracting...", total=len(pages_active))
+        task = prog.add_task("Phase 1 (text + tables)...", total=len(pages_active))
 
         with ThreadPoolExecutor(max_workers=n_workers) as ex:
             futures = {
                 ex.submit(_process_page, page, doc_id, sector, dpr_path,
                           skip_facts, skip_tables, classifications[page.page_num],
-                          use_vision): page.page_num
+                          False): page.page_num    # use_vision=False → defer
                 for page in pages_active
             }
             for future in as_completed(futures):
@@ -269,8 +316,34 @@ def extract_dpr(
                 all_facts.extend(r["facts"])
                 if r["table_rows"]:
                     all_tables[str(r["page_num"] + 1)] = r["table_rows"]
+                if r.get("needs_vision"):
+                    deferred_vision.append(r["page_num"])
 
-    # Release the per-thread pdfplumber handles opened during table extraction.
+    # ── Phase 2: GLM-OCR vision on the deferred table pages, with LM Studio unloaded.
+    if use_vision and deferred_vision:
+        from extractors.table_extractor import _try_vision_llm
+        console.print(f"\n🖼  Phase 2: {len(deferred_vision)} table page(s) need vision OCR.")
+        _free_vram_for_vision()   # unload Ollama text/embed + LM Studio first
+        vision_fail = 0
+        with Progress(SpinnerColumn(), TextColumn("{task.description}"),
+                      BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("Phase 2 (vision OCR)...", total=len(deferred_vision))
+            for pn in sorted(deferred_vision):    # sequential — keep VRAM low
+                try:
+                    rows = _try_vision_llm(dpr_path, pn, context=f"{sector} DPR page {pn + 1}")
+                    if rows:
+                        all_tables[str(pn + 1)] = rows
+                except Exception as e:
+                    vision_fail += 1
+                    logger.warning(f"Vision OCR failed on page {pn + 1} (skipped): {str(e)[:120]}")
+                prog.advance(task)
+        if vision_fail:
+            console.print(f"[yellow]{vision_fail} vision page(s) failed and were skipped.[/yellow]")
+        console.print("[dim]Vision phase done. LM Studio was unloaded — reload it "
+                      "before run_engines / run_context_validation.[/dim]")
+
+    # Release the per-thread PDF handles opened during table extraction.
     from extractors.table_extractor import close_cached_pdfs
     close_cached_pdfs()
 
