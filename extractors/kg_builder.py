@@ -48,16 +48,25 @@ _TRIPLE_SYSTEM = (
 
 # FIX 1: Single combined prompt — entity-relation triples AND event-entity pairs
 # in one LLM call instead of two serial calls.
-_COMBINED_EXTRACTION_PROMPT = """You are extracting structured knowledge from a {sector} engineering DPR passage.
+_COMBINED_EXTRACTION_PROMPT = """You are extracting a STRUCTURED engineering knowledge graph from a {sector} passage.
 
-Extract TWO things from the passage below:
+Extract TWO things:
 
-1. TRIPLES: entities and the relations between them.
-   - Entities: specific engineering elements (structures, parameters, materials, locations, standards)
-   - Relations: concise verb phrases
+1. TRIPLES — prefer specific, measurable engineering relationships. Good triples connect a
+   parameter/element to a VALUE, SPEC, CONSTRAINT, MATERIAL, STANDARD, or LOCATION.
+   Use precise relation phrases such as:
+     has value / has dimension / has capacity / made of / has grade /
+     must not exceed / must be at least / requires / complies with /
+     located at / connects / part of / designed for
+   AVOID vague narrative relations like "expected to manage", "participates in",
+   "being developed by", "plans to", "likely to" — skip sentences that only describe
+   intentions, history, or background rather than engineering facts/requirements.
 
-2. EVENTS: engineering events/processes and the entities involved.
-   - Events: engineering actions, measurements, design decisions, compliance statements
+   - Head/Tail must be concrete nouns (keep the value+unit together in the Tail,
+     e.g. Tail = "1:100", "7.85 m", "M40", "25 t", "160 kmph").
+
+2. EVENTS — engineering requirements/decisions and the entities involved (a compliance
+   statement, a design value, a measurement). Skip generic narrative.
 
 Passage:
 {text}
@@ -65,16 +74,16 @@ Passage:
 Return ONLY a JSON object with exactly these two keys:
 {{
   "triples": [
-    {{"Head": "entity noun", "Relation": "verb phrase", "Tail": "entity noun"}},
-    ...
+    {{"Head": "ruling gradient", "Relation": "must not exceed", "Tail": "1:100"}},
+    {{"Head": "formation width (double line)", "Relation": "must be at least", "Tail": "13.15 m"}},
+    {{"Head": "rail", "Relation": "has grade", "Tail": "60 kg/m 90 UTS"}}
   ],
   "events": [
-    {{"Event": "engineering action or finding", "Entity": ["entity1", "entity2"]}},
-    ...
+    {{"Event": "design speed specified", "Entity": ["design speed", "160 kmph"]}}
   ]
 }}
 
-Extract all meaningful triples and events. If none found, return empty arrays."""
+Extract every concrete engineering triple/requirement. Skip background prose. If none, return empty arrays."""
 
 # FIX 2: Batched concept induction — all entities + relations in one call
 _BATCH_CONCEPT_PROMPT = """You are labelling engineering entities and relations from a {sector} DPR with abstract concept types.

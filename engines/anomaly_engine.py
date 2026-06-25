@@ -302,12 +302,16 @@ def _llm_anomaly_scan(facts: list[dict], sector: str, doc_id: str) -> list[Anoma
     facts_text = "\n".join(
         f"  {f.get('attribute','?')} = {f.get('value','?')} {f.get('unit','')} "
         f"(subject: {f.get('subject','?')})"
+        + (f"  [context: {(f.get('context') or '')[:120]}]" if f.get('context') else "")
         for f in facts[:60]
     )
 
     prompt = (
         f"You are a senior {sector} engineer reviewing DPR data for anomalies.\n\n"
-        f"Engineering facts extracted from a {sector} DPR:\n{facts_text}\n\n"
+        f"Engineering facts (each with the sentence it came from):\n{facts_text}\n\n"
+        "Use the context to interpret each value before judging it — a value that looks odd "
+        "may be normal in context (and vice-versa), and units/meaning matter (a slope is not a "
+        "length, a % is not metres).\n"
         "Identify up to 5 unusual, improbable, or suspicious values/combinations.\n"
         "For each anomaly return: "
         '{"description": "...", "attribute": "...", "flagged_value": "...", '
@@ -396,7 +400,7 @@ def run_anomaly_engine(doc_id: str, sector: str) -> dict:
         WHERE f.fact_type <> 'table_row'
         RETURN f.fact_id AS fid, f.subject AS subject, f.attribute AS attribute,
                f.value AS value, f.unit AS unit, f.source_page AS page,
-               f.sector AS sector, f.doc_id AS doc_id
+               f.context AS context, f.sector AS sector, f.doc_id AS doc_id
         """,
         {"doc_id": doc_id}
     )

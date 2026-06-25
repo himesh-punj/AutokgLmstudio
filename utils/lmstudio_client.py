@@ -25,30 +25,51 @@ import re
 from typing import Optional
 
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from loguru import logger
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Retry transient errors (timeouts, connection drops, 5xx) but NOT 4xx —
+    a 400 (e.g. context-size exceeded) is deterministic, so retrying just wastes time."""
+    if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
+        return exc.response.status_code >= 500
+    return True
 
 from config.backend_settings import (
     LMSTUDIO_BASE_URL, LMSTUDIO_API_KEY,
     LMSTUDIO_TEXT_MODEL, LMSTUDIO_FAST_MODEL,
     LMSTUDIO_TIMEOUT, LMSTUDIO_MAX_RETRIES, LMSTUDIO_MAX_TOKENS,
+    USE_THINKING_FOR_VALIDATION, LMSTUDIO_VALIDATION_MODEL,
+    LMSTUDIO_VALIDATION_MAX_TOKENS,
 )
 
 # ─── Model router (mirrors ollama_client.TaskType) ─────────────────────────────
 # Heavy structured extraction → text model.  Simple/short prompts → fast model.
+# Validation reasoning → optional separate "thinking" model (see backend_settings).
 
 class TaskType:
     EXTRACTION   = "extraction"    # fact / triple extraction  → heavy model
     CONCEPT      = "concept"       # concept induction         → fast model
     CLASSIFY     = "classify"      # sector classification     → fast model
     CONSISTENCY  = "consistency"   # consistency / anomaly LLM → heavy model
-    VALIDATION   = "validation"    # validation reasoning      → heavy model
+    VALIDATION   = "validation"    # validation reasoning      → thinking model (if enabled)
 
 
 def get_model_for_task(task: str) -> str:
     """Route a task to the appropriate LM Studio model id."""
+    if task == TaskType.VALIDATION and USE_THINKING_FOR_VALIDATION:
+        return LMSTUDIO_VALIDATION_MODEL
     fast_tasks = {TaskType.CONCEPT, TaskType.CLASSIFY}
     return LMSTUDIO_FAST_MODEL if task in fast_tasks else LMSTUDIO_TEXT_MODEL
+
+
+def _max_tokens_for_model(model: Optional[str]) -> int:
+    """The reasoning validation model needs a larger budget — thinking burns
+    output tokens before it emits the JSON answer."""
+    if USE_THINKING_FOR_VALIDATION and model == LMSTUDIO_VALIDATION_MODEL:
+        return LMSTUDIO_VALIDATION_MAX_TOKENS
+    return LMSTUDIO_MAX_TOKENS
 
 
 # ─── Low-level chat call ───────────────────────────────────────────────────────
@@ -63,7 +84,7 @@ def _headers() -> dict:
 @retry(
     stop=stop_after_attempt(LMSTUDIO_MAX_RETRIES),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(Exception),
+    retry=retry_if_exception(_is_retryable),
     reraise=True,
 )
 def _chat(messages: list[dict], model: str, temperature: float = 0.1,
@@ -89,18 +110,21 @@ def _chat(messages: list[dict], model: str, temperature: float = 0.1,
 
 # ─── Text generation ───────────────────────────────────────────────────────────
 
-def generate(prompt: str, system: str = "", model: str = None, temperature: float = 0.1) -> str:
-    """Generate a text response from LM Studio. Low temperature for structured extraction."""
+def generate(prompt: str, system: str = "", model: str = None, temperature: float = 0.1,
+             max_tokens: int = None) -> str:
+    """Generate a text response from LM Studio. Low temperature for structured extraction.
+    max_tokens defaults per-model (the reasoning validation model gets a larger budget)."""
     m = model or LMSTUDIO_TEXT_MODEL
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    return _chat(messages, model=m, temperature=temperature)
+    return _chat(messages, model=m, temperature=temperature,
+                 max_tokens=max_tokens or _max_tokens_for_model(m))
 
 
 def generate_json(prompt: str, system: str = "", model: str = None,
-                  temperature: float = 0.05) -> dict | list | None:
+                  temperature: float = 0.05, max_tokens: int = None) -> dict | list | None:
     """
     Generate and parse JSON from LM Studio.
     Handles: markdown fences, multiple objects (wraps into array),
@@ -113,15 +137,33 @@ def generate_json(prompt: str, system: str = "", model: str = None,
         "No markdown, no explanation, no preamble. "
         "Start your response directly with { or [ as appropriate."
     )
-    raw = generate(prompt, system=json_system, model=model, temperature=temperature)
+    raw = generate(prompt, system=json_system, model=model, temperature=temperature,
+                   max_tokens=max_tokens)
     return _extract_json(raw)
 
 
 # ─── Robust JSON extraction (mirrors ollama_client) ────────────────────────────
 
+def _strip_think(raw: str) -> str:
+    """Remove a reasoning model's <think>…</think> block(s). The JSON answer
+    follows the reasoning, so we keep only what comes after. Handles a closed
+    block, and the truncated case where the closing tag never arrives (then the
+    whole thing was thinking → nothing usable)."""
+    if "<think>" not in raw and "</think>" not in raw:
+        return raw
+    if "</think>" in raw:
+        # keep everything after the LAST closing tag (the actual answer)
+        raw = raw.rsplit("</think>", 1)[1]
+    else:
+        # opened but never closed → reasoning got truncated, no answer emitted
+        raw = raw.split("<think>", 1)[0]
+    return raw.strip()
+
+
 def _extract_json(raw: str) -> dict | list | None:
     """Best-effort recovery of a JSON value from a (possibly messy) LLM string."""
-    # Strip markdown fences if present
+    # Strip a reasoning model's <think>…</think> first, then markdown fences
+    raw = _strip_think(raw)
     raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
     raw = re.sub(r"\s*```$", "", raw, flags=re.MULTILINE)
     raw = raw.strip()

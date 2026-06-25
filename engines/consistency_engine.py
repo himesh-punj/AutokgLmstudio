@@ -262,7 +262,7 @@ def _llm_consistency_check(doc_id: str, sector: str) -> list[ConsistencyIssue]:
         MATCH (d:{NodeLabel.DOCUMENT} {{doc_id: $doc_id}})-[:{RelType.HAS_FACT}]->(f:{NodeLabel.FACT})
         WHERE f.fact_type <> 'table_row' AND f.confidence > 0.6
         RETURN f.subject AS s, f.attribute AS a, f.value AS v, f.unit AS u,
-               f.source_page AS pg
+               f.source_page AS pg, f.context AS ctx
         ORDER BY f.source_page
         LIMIT 80
         """,
@@ -274,18 +274,22 @@ def _llm_consistency_check(doc_id: str, sector: str) -> list[ConsistencyIssue]:
 
     facts_text = "\n".join(
         f"  p{f['pg']}: {f['s']} | {f['a']} = {f['v']} {f['u']}"
+        + (f"   [context: {(f['ctx'] or '')[:120]}]" if f.get('ctx') else "")
         for f in facts
     )
 
     prompt = (
         f"You are reviewing a {sector} DPR for logical consistency.\n\n"
-        f"Here are engineering facts extracted from the document:\n{facts_text}\n\n"
+        f"Here are engineering facts (each with the sentence it came from):\n{facts_text}\n\n"
+        "Use the context to interpret each value correctly — the same word can mean different "
+        "things (e.g. 'speed' may be design vs average vs sectional; a 'gradient' length is not "
+        "a slope). Only flag a real conflict when two values describe the SAME thing in context.\n"
         "Identify up to 5 logical inconsistencies. For each, return a JSON object:\n"
         '{"description": "...", "evidence": "exact facts involved", '
         '"severity": "CRITICAL|HIGH|MEDIUM", "type": "brief label"}\n\n'
         "Return a JSON array. If no inconsistencies, return [].\n"
-        "Focus on: conflicting values, physically impossible combinations, "
-        "missing critical parameters given what's present."
+        "Focus on: conflicting values for the same parameter, physically impossible "
+        "combinations, missing critical parameters given what's present."
     )
 
     result = generate_json(prompt)

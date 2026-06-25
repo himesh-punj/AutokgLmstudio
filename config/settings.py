@@ -46,14 +46,14 @@ DPR_MAX_PAGES   = None  # None = process entire document from DPR_START_PAGE
 RULEBOOK_START_PAGE = 1    # Rulebooks don't have TOC pages to skip
 RULEBOOK_MAX_PAGES  = None # None = process entire rulebook
 
-EXTRACTION_WORKERS  = 6    # Parallel workers for page extraction.
-                           # These threads overlap PDF/table parsing (CPU) with LLM
-                           # calls. To actually run the LLM calls CONCURRENTLY (not
-                           # just queued), LM Studio must be loaded with matching
-                           # parallelism, e.g.:
-                           #   lms load qwen2.5-14b-instruct --gpu max -c 8192 --parallel 4
-                           # Higher --parallel multiplies KV-cache VRAM — if it spills
-                           # on the 12GB GPU, drop ctx to 4096 or --parallel to 2-3.
+EXTRACTION_WORKERS  = 2    # Parallel workers for page extraction.
+                           # ⚠ MUST be <= LM Studio's --parallel. If workers > --parallel,
+                           # LM Studio REJECTS the excess requests with HTTP 400 and those
+                           # pages extract ZERO facts (a 6-worker/parallel-3 run looked
+                           # "fast" but lost ~96% of facts: 23 vs 564). A 14B stream uses
+                           # ~50% GPU, so 2-3 concurrent streams fill it; >3 also over-splits
+                           # the 8192 context per slot and 400s. Proven config:
+                           #   workers = 3  +  lms load ... -c 8192 --parallel 3
 
 # ─── Neo4j ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +76,14 @@ OLLAMA_MAX_RETRIES = 3
 
 CHUNK_SIZE     = 1200   # tokens per chunk sent to LLM for fact extraction
 CHUNK_OVERLAP  = 150
+
+# Multi-shot fact extraction: a page is split into chunks of this many characters
+# and extracted in several small LLM calls (instead of one big call). Keeps each
+# request light → bounded VRAM/compute → avoids the spill-to-RAM freeze / GPU TDR
+# on dense pages, and lets you run more parallel workers. Smaller = safer/lighter.
+PAGE_EXTRACT_CHUNK_CHARS = 1800   # dense table text tokenises ~1 char/token, so keep chunks
+                                  # small enough that chunk + prompt fits a 4096-token slot
+                                  # (-c 12288 / --parallel 3). Overflow still auto-retries halved.
 PAGE_DPI       = 200    # DPI for rasterising pages for vision fallback
 TABLE_MIN_FILL = 0.75   # pdfplumber/camelot table acceptance threshold (0-1).
                         # Accuracy-first: a stage's output must be >=75% filled to be

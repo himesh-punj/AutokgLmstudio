@@ -232,8 +232,19 @@ def _compare_status(fact_val: str, operator: str, threshold: str) -> str:
             return "review"
         return "pass" if sm else "fail"
 
-    if fk in _GRAD_KINDS or tk in _GRAD_KINDS:
-        fv, tv = _to_slope(fv, fk), _to_slope(tv, tk)
+    # Gradient comparisons: reconcile both sides to a slope fraction. When the rule
+    # is a ratio (e.g. 1:100) and the DPR value is a bare decimal, it's almost
+    # certainly a percent (rail gradients are < ~2%); an absurdly large bare value
+    # is a mis-extraction (a length, or the standard's own restated ratio denominator
+    # like "150" for 1:150) and cannot be judged here.
+    if tk == "ratio" or fk in _GRAD_KINDS:
+        if fk == "plain":
+            if abs(fv) > 5:
+                return "review"
+            fv = fv / 100.0          # bare gradient decimal → percent → slope
+        else:
+            fv = _to_slope(fv, fk)
+        tv = _to_slope(tv, tk)
 
     tol = max(1e-9, abs(tv) * MARGINAL_TOLERANCE)
 
@@ -257,13 +268,43 @@ def _compare_status(fact_val: str, operator: str, threshold: str) -> str:
     return "review"
 
 
-def _evaluate(fact_val: str, operator: str, threshold: str) -> tuple[str, str]:
+_LENGTH_UNITS = {"m", "km", "mm", "cm", "metre", "meter", "metres", "meters", "ft", "feet"}
+
+
+def _is_length_unit(unit: str) -> bool:
+    return str(unit).strip().lower() in _LENGTH_UNITS
+
+
+# Whole-word token matching — prevents substring false-positives like the rail
+# "section" matching the "sub-sectioning and paralleling post" rule.
+_MATCH_STOPWORDS = {
+    "the", "a", "an", "of", "and", "or", "for", "to", "per", "in", "on", "by",
+    "with", "at", "is", "be", "shall", "must", "no", "not", "as", "from",
+}
+
+
+def _attr_tokens(s: str) -> set:
+    return {t for t in re.split(r"[^a-z0-9]+", str(s).lower())
+            if len(t) > 2 and t not in _MATCH_STOPWORDS}
+
+
+def _share_significant_token(a: str, b: str) -> bool:
+    """True if the two attribute strings share a meaningful whole word."""
+    return bool(_attr_tokens(a) & _attr_tokens(b))
+
+
+def _evaluate(fact_val: str, operator: str, threshold: str, fact_unit: str = "") -> tuple[str, str]:
     """
     Full evaluation of one fact against one rule.
     Returns (classification, status). Multi-condition/un-parseable thresholds are
     routed to review; everything else goes through tolerance-aware comparison.
     """
     if _is_ambiguous_threshold(threshold):
+        return "Needs Review", "review"
+    # A length-valued fact (e.g. "3440 m") compared to a gradient ratio rule
+    # (e.g. 1:100) is a unit mismatch — not a real violation, defer to review.
+    _, tk = _parse_quantity(threshold)
+    if tk == "ratio" and _is_length_unit(fact_unit):
         return "Needs Review", "review"
     status = _compare_status(fact_val, operator, threshold)
     return _STATUS_TO_CLASS[status], status
@@ -291,26 +332,46 @@ def _describe_operator(operator: str, threshold: str, unit: str) -> str:
 
 # ─── Stage 1: Graph-based fact-rule matching ──────────────────────────────────
 
+# Once embeddings fail (model missing / endpoint refused) we disable them for the
+# rest of the run so we don't pay a multi-minute timeout on every subsequent call.
+_EMBED_STATE = {"disabled": False}
+
+
 def _embed_texts_local(texts: list[str]):
     """
-    Embed texts using mxbai-embed-large via Ollama.
-    Returns L2-normalised float32 numpy array (N, dim).
-    Falls back to zero vectors if Ollama embed is unavailable.
+    Embed texts using mxbai-embed-large via Ollama's REST API (with a hard timeout).
+    Returns an L2-normalised float32 array (N, dim), or zeros if embeddings are
+    unavailable. On the first failure, embeddings are disabled for the run so the
+    next calls return instantly instead of hanging.
     """
     import numpy as np
     if not texts:
         return np.zeros((0, 1024), dtype=np.float32)
+    if _EMBED_STATE["disabled"]:
+        return np.zeros((len(texts), 1024), dtype=np.float32)
+    # Ollama /api/embed returns 400 on empty input items — replace blanks with a space.
+    clean = [t if (isinstance(t, str) and t.strip()) else " " for t in texts]
     try:
-        import ollama as _ollama
-        from config.settings import OLLAMA_EMBED_MODEL
-        response = _ollama.embed(model=OLLAMA_EMBED_MODEL, input=texts)
-        arr = np.array(response["embeddings"], dtype=np.float32)
+        import requests
+        from config.settings import OLLAMA_EMBED_MODEL, OLLAMA_BASE_URL
+        out: list = []
+        for i in range(0, len(clean), 64):   # batch to keep requests small
+            resp = requests.post(
+                f"{OLLAMA_BASE_URL}/api/embed",
+                json={"model": OLLAMA_EMBED_MODEL, "input": clean[i:i + 64]},
+                timeout=60,   # hard cap — never hang for minutes
+            )
+            resp.raise_for_status()
+            out.extend(resp.json().get("embeddings") or [])
+        arr = np.array(out, dtype=np.float32)
+        if arr.size == 0:
+            raise ValueError("no embeddings returned")
         norms = np.linalg.norm(arr, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1, norms)
         return arr / norms
     except Exception as e:
-        logger.debug(f"Embedding unavailable for validation: {e}")
-        import numpy as np
+        logger.warning(f"Embeddings unavailable — disabling semantic matching for this run: {e}")
+        _EMBED_STATE["disabled"] = True
         return np.zeros((len(texts), 1024), dtype=np.float32)
 
 
@@ -355,6 +416,7 @@ def _match_facts_to_rules(doc_id: str, sector: str) -> list[ValidationRow]:
                f.unit        AS funit,
                f.attribute   AS fattr,
                f.subject     AS fsubj,
+               f.context     AS fctx,
                f.source_page AS fpage,
                f.printed_page AS fppage,
                r.rule_id     AS rid,
@@ -371,6 +433,41 @@ def _match_facts_to_rules(doc_id: str, sector: str) -> list[ValidationRow]:
         {"doc_id": doc_id, "sector": sector, "applicable_sectors": applicable_sectors}
     )
 
+    # ── Token filter: the Cypher match is a loose substring test, so "section"
+    # (rail section) matches "sub-sectioning…". Require a shared WHOLE word between
+    # the fact and rule attributes (or an exact attribute match) to keep the pair.
+    before_tok = len(pairs)
+    pairs = [
+        p for p in pairs
+        if str(p.get("fattr", "")).strip().lower() == str(p.get("rattr", "")).strip().lower()
+        or _share_significant_token(p.get("fattr", ""), p.get("rattr", ""))
+    ]
+    if len(pairs) < before_tok:
+        logger.info(f"Pass 1 token filter: dropped {before_tok - len(pairs)} substring false-matches")
+
+    # ── De-duplicate: a generic fact attribute ("gradient") matches EVERY rule whose
+    # attribute contains it (Ruling/Station/Approach Gradient…), turning one reading
+    # into 5 failures. Keep only the single most-specific rule per fact — the one
+    # whose attribute words best appear in the fact's attribute + context.
+    pre_dedup_rule_ids = {p["rid"] for p in pairs}   # every rule Pass 1 touched
+
+    def _specificity(p):
+        hay = f"{p.get('fattr','')} {p.get('fctx','')}".lower()
+        rtoks = [t for t in re.split(r"\W+", str(p.get("rattr", "")).lower()) if len(t) > 2]
+        score = sum(1 for t in rtoks if t in hay)
+        return (score, len(str(p.get("rattr", ""))),
+                SEVERITY_WEIGHTS.get(p.get("rsev") or Severity.HIGH, 2))
+
+    best_by_fact: dict = {}
+    for p in pairs:
+        fid = p["fid"]
+        if fid not in best_by_fact or _specificity(p) > _specificity(best_by_fact[fid]):
+            best_by_fact[fid] = p
+    dropped = len(pairs) - len(best_by_fact)
+    if dropped:
+        logger.info(f"Pass 1 de-dup: kept best rule per fact, dropped {dropped} duplicate fact-rule pairs")
+    pairs = list(best_by_fact.values())
+
     rows = []
     for p in pairs:
         # Re-derive the operator from the rule's wording — stored operators are
@@ -382,7 +479,7 @@ def _match_facts_to_rules(doc_id: str, sector: str) -> list[ValidationRow]:
         dpr_display = f"{p['fval']} {p['funit']}".strip()
         rule_display = _describe_operator(eff_op, p["rthresh"], p["runit"] or "")
 
-        classification, status = _evaluate(p["fval"], eff_op, p["rthresh"])
+        classification, status = _evaluate(p["fval"], eff_op, p["rthresh"], p.get("funit", ""))
 
         if status == "pass":
             reason = (
@@ -452,8 +549,9 @@ def _match_facts_to_rules(doc_id: str, sector: str) -> list[ValidationRow]:
         """,
         {"applicable_sectors": applicable_sectors}
     )
-    matched_rule_ids = {p["rid"] for p in pairs}
-    unmatched_rules  = [r for r in all_rules if r["rid"] not in matched_rule_ids]
+    # Use the PRE-dedup set: a rule that Pass 1 matched (even if dropped as a
+    # duplicate for its fact) must NOT be re-added by Pass 2's semantic search.
+    unmatched_rules  = [r for r in all_rules if r["rid"] not in pre_dedup_rule_ids]
 
     if unmatched_rules:
         # Load all facts for the document (attribute + subject as search text)
@@ -509,7 +607,7 @@ def _match_facts_to_rules(doc_id: str, sector: str) -> list[ValidationRow]:
                     str(rule.get("rtext", "")), str(rule.get("rattr", "")), str(rule.get("rop", ""))
                 )
                 rule_display = _describe_operator(eff_op, str(rule.get("rthresh", "")), str(rule.get("runit", "")))
-                classification, status = _evaluate(fact.get("fval", ""), eff_op, str(rule.get("rthresh", "")))
+                classification, status = _evaluate(fact.get("fval", ""), eff_op, str(rule.get("rthresh", "")), fact.get("funit", ""))
                 sem_note = f"(Matched semantically, similarity={best_sim:.2f})"
 
                 if status == "pass":
@@ -854,9 +952,14 @@ def _semantic_fact_rule_matching(doc_id: str, sector: str) -> list[ValidationRow
         from extractors.kg_embeddings import search_edges
         from config.settings import PROCESSED_DIR
 
+        # This optional stage searches the DPR's OWN knowledge-graph triples, which
+        # only exist if a DPR KG was built (run_kg_build builds the rulebook KG by
+        # default, not the DPR's). Semantic fact↔rule matching is already handled by
+        # Pass 2 of _match_facts_to_rules, so this is a redundant bonus pass — skip
+        # quietly when the DPR triple index isn't present.
         index_path = PROCESSED_DIR / doc_id / "faiss" / "edges.index"
         if not index_path.exists():
-            logger.debug("No FAISS edge index found — skipping semantic matching")
+            logger.debug("No DPR KG triple index (optional) — semantic matching handled by Pass 2; skipping Stage 4")
             return []
 
         rules = run_read(

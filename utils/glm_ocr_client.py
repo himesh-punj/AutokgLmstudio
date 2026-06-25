@@ -23,8 +23,16 @@ from pathlib import Path
 from typing import Optional
 
 import ollama
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from loguru import logger
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Don't retry 4xx (e.g. a 400 'context size exceeded') — it's deterministic."""
+    sc = getattr(exc, "status_code", None)
+    if sc is not None and 400 <= sc < 500:
+        return False
+    return True
 
 from config.backend_settings import (
     GLM_OCR_MODEL, GLM_OCR_NUM_CTX, GLM_OCR_TEMPERATURE,
@@ -37,7 +45,7 @@ from config.settings import OLLAMA_MAX_RETRIES
 @retry(
     stop=stop_after_attempt(OLLAMA_MAX_RETRIES),
     wait=wait_exponential(multiplier=2, min=4, max=20),
-    retry=retry_if_exception_type(Exception),
+    retry=retry_if_exception(_is_retryable),
     reraise=True,
 )
 def vision_extract(image_path: Path, prompt: str, model: str = None) -> str:

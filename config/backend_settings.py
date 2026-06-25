@@ -45,10 +45,37 @@ LMSTUDIO_TEXT_MODEL = "qwen2.5-14b-instruct"    # heavy: fact / rule / validatio
 # 14B cost is negligible). Point this at a downloaded 8B if you prefer.
 LMSTUDIO_FAST_MODEL = "qwen2.5-14b-instruct"    # fast:  sector classify / concept induction
 
-LMSTUDIO_TIMEOUT     = 180   # seconds — first call includes JIT model load, keep generous
-LMSTUDIO_MAX_RETRIES = 3
-LMSTUDIO_MAX_TOKENS  = 4096  # max generated tokens per request (fact arrays can be long)
+LMSTUDIO_TIMEOUT     = 240   # seconds — generous headroom for concurrent generation
+LMSTUDIO_MAX_RETRIES = 2     # a timed-out call rarely succeeds on retry — don't burn 3×240s
+LMSTUDIO_MAX_TOKENS  = 1536  # max generated tokens/request. Pages are now extracted
+                             # in small chunks (settings.PAGE_EXTRACT_CHUNK_CHARS), so each
+                             # call is light: prompt ~2100 tokens + this ~1536 ≈ 3700 tokens,
+                             # which fits comfortably even at -c 8192 --parallel 2 (4096/slot).
+                             # Smaller calls = bounded VRAM = no spill-to-RAM freeze, and you
+                             # can run more parallel workers. Raise only if facts get cut off.
 LMSTUDIO_NUM_CTX     = 8192  # advisory context hint (LM Studio honours its own loaded ctx)
+
+
+# ─── Reasoning ("thinking") model for the validation judge ─────────────────────
+# The validation judge (validators/context_validator.py) makes one bounded call
+# per requirement that must (a) disambiguate context (design vs average speed) and
+# (b) apply dimensional sanity (metres ≠ ratio, % ≠ length) CONSISTENTLY. A plain
+# instruct model does this non-deterministically — on c2cd8556 two sibling ratio
+# rules got opposite verdicts on the same metres-vs-ratio input. A reasoning model
+# that thinks step-by-step before answering fixes that.
+#
+#   Download:  lmstudio-community/Qwen3-14B-GGUF  (Q4_K_M, ~9 GB — fits the 12 GB
+#              RTX 5070 because validation runs solo, no GLM-OCR sharing).
+#   Confirm the exact model id LM Studio exposes with `python check_backends.py`
+#   and set LMSTUDIO_VALIDATION_MODEL to it.
+#
+# Thinking models emit a <think>…</think> block before the JSON answer; that block
+# is stripped in lmstudio_client._extract_json, and the validation call gets the
+# larger token budget below so the answer isn't truncated by the reasoning.
+# Set USE_THINKING_FOR_VALIDATION=False to fall back to LMSTUDIO_TEXT_MODEL.
+USE_THINKING_FOR_VALIDATION    = True
+LMSTUDIO_VALIDATION_MODEL      = "qwen3-14b"
+LMSTUDIO_VALIDATION_MAX_TOKENS = 4096   # reasoning eats output tokens before the JSON
 
 
 # ─── GLM-OCR vision model (served by Ollama) ───────────────────────────────────
@@ -57,7 +84,19 @@ LMSTUDIO_NUM_CTX     = 8192  # advisory context hint (LM Studio honours its own 
 #     ollama list                 # ← copy the NAME column value here
 # Run `python check_backends.py` to print the available tags.
 
+# ─── Optional: route low-density pages to a small/fast model ───────────────────
+# Low-density pages (short text, few engineering values) can be extracted by a
+# small model served by Ollama (separate process from LM Studio, so no model
+# swapping). OFF by default — on a 12GB GPU a 3B model competes for VRAM with the
+# 14B (LM Studio) + GLM-OCR, and the page pre-filter already skips no-signal pages,
+# so the win here is marginal/negative. Enable ONLY with VRAM headroom, after:
+#   ollama pull qwen2.5:3b-instruct
+USE_FAST_PAGE_ROUTING = False
+FAST_PAGE_MODEL       = "qwen2.5:3b-instruct"   # Ollama small model for low-density pages
+
+
 GLM_OCR_MODEL       = "glm-ocr:latest"   # default tag (~2.2 GB) from `ollama pull glm-ocr`
-GLM_OCR_NUM_CTX     = 4096
+GLM_OCR_NUM_CTX     = 8192               # a rasterised page image is ~4k+ vision tokens —
+                                         # 4096 overflows ("exceeds context size"); 8192 fits.
 GLM_OCR_TEMPERATURE = 0.05
 GLM_OCR_TIMEOUT     = 180         # seconds per vision request

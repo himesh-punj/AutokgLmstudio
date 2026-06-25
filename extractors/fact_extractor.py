@@ -28,7 +28,7 @@ from typing import Optional
 
 from loguru import logger
 
-from config.settings import CHUNK_SIZE, SECTOR_KEYS, NodeLabel, RelType
+from config.settings import CHUNK_SIZE, PAGE_EXTRACT_CHUNK_CHARS, SECTOR_KEYS, NodeLabel, RelType
 from utils.llm_router import generate_json
 from utils.neo4j_client import run_write
 
@@ -107,10 +107,16 @@ TEXT:
 Return a JSON array. Each object MUST have:
 - "fact_type": one of ["parameter", "measurement", "material", "cost", "schedule", "assumption", "design_value"]
 - "subject": engineering element described (e.g. "pile foundation", "corridor 3", "station")
-- "attribute": specific property (e.g. "length", "total cost", "design speed")
+- "attribute": the SPECIFIC property, KEEPING its qualifier — never drop the adjective that
+  changes the meaning. Use "design speed", "average speed", "sectional speed", "ruling gradient",
+  "gradient length", "maximum gradient", "minimum radius" — NOT a bare "speed"/"gradient"/"radius".
 - "value": the value as a string — numeric preferred (e.g. "63246", "M30", "80")
-- "unit": unit (e.g. "crore Rs.", "km", "kmph") — empty string if none
-- "context": the sentence containing this fact (≤ 200 chars)
+- "unit": the unit EXACTLY as written (e.g. "crore Rs.", "km", "kmph", "m", "%", "1 in 200") —
+  empty string if none. The unit/form carries dimension; keep "1 in 200" as a ratio, "%" as percent.
+- "context": the full sentence/phrase containing this fact (≤ 200 chars) — keep enough words to
+  tell WHAT the value describes and whether it is the DPR's own proposal or a quoted standard.
+- "nature": "proposed" if this is a value the DPR adopts/uses, or "standard_reference" if the DPR
+  is merely quoting a code/guideline requirement.
 - "confidence": 0.85–1.0 for clearly stated facts, 0.7–0.85 for implied facts
 
 Extract aggressively — include facts stated in prose, tables, and lists.
@@ -199,6 +205,62 @@ def _write_table_facts_to_neo4j(table_rows: list[dict], doc_id: str, sector: str
         )
 
 
+# ─── Fast-model routing (optional, off by default) ────────────────────────────
+
+def _use_fast_routing() -> bool:
+    try:
+        from config.backend_settings import USE_FAST_PAGE_ROUTING
+        return bool(USE_FAST_PAGE_ROUTING)
+    except Exception:
+        return False
+
+
+def _is_context_or_400(e: Exception) -> bool:
+    """
+    True for a context-size overflow OR any HTTP 400. The 400's HTTPError string is
+    just "400 Client Error" (no body), so string-matching alone misses it — check the
+    response status code too. These are deterministic, so we recover by truncating.
+    """
+    s = str(e).lower()
+    if any(k in s for k in ("context", "exceed", "too large", "too long")):
+        return True
+    resp = getattr(e, "response", None)
+    return resp is not None and getattr(resp, "status_code", None) == 400
+
+
+def _chunk_text(text: str, max_chars: int, overlap: int = 200) -> list[str]:
+    """
+    Split page text into <= max_chars chunks, preferring to break on a line
+    boundary, with a small overlap so a fact isn't cut across chunks. Returns
+    [text] unchanged when it already fits in one chunk (single-shot).
+    """
+    text = text.strip()
+    if len(text) <= max_chars:
+        return [text]
+    chunks, start, n = [], 0, len(text)
+    while start < n:
+        end = min(start + max_chars, n)
+        if end < n:
+            nl = text.rfind("\n", start + max_chars - 400, end)
+            if nl > start:
+                end = nl
+        chunks.append(text[start:end])
+        if end >= n:
+            break
+        start = max(end - overlap, start + 1)
+    return chunks
+
+
+def _is_low_density(text: str) -> bool:
+    """Short page with few engineering values → safe for a smaller model."""
+    import re as _re
+    if len(text.strip()) > 600:
+        return False
+    hits = len(_re.findall(
+        r'\d+\.?\d*\s*(?:m|km|mm|%|kmph|kg|t|rs|crore|lakh|ha|cum|mpa|kn)', text, _re.I))
+    return hits < 3
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def extract_facts_from_page(
@@ -216,24 +278,49 @@ def extract_facts_from_page(
     if not text or len(text.strip()) < 30:
         return []
 
-    # Truncate to chunk size (rough token approximation: 1 token ≈ 4 chars)
-    max_chars = CHUNK_SIZE * 4
-    text_chunk = text[:max_chars]
+    def _call(txt: str):
+        """One bounded LLM call on a chunk of page text."""
+        p = _build_extraction_prompt(txt, sector, page_num, doc_id)
+        # Optional speed lever: route low-density chunks to a small Ollama model.
+        if _use_fast_routing() and _is_low_density(txt):
+            from utils.ollama_client import generate_json as _fast_json
+            from config.backend_settings import FAST_PAGE_MODEL
+            return _fast_json(p, system=_SYSTEM_PROMPT, model=FAST_PAGE_MODEL)
+        return generate_json(p, system=_SYSTEM_PROMPT)
 
-    prompt = _build_extraction_prompt(text_chunk, sector, page_num, doc_id)
-    facts = generate_json(prompt, system=_SYSTEM_PROMPT)
+    def _gen(txt: str) -> list:
+        """Call once; on a context-overflow / 400, retry that chunk halved. Returns a list."""
+        try:
+            r = _call(txt)
+        except Exception as e:
+            if _is_context_or_400(e):
+                try:
+                    r = _call(txt[: max(600, len(txt) // 2)])
+                except Exception:
+                    return []
+            else:
+                raise
+        return r if isinstance(r, list) else []
 
-    if not isinstance(facts, list):
-        logger.debug(f"Page {page_num + 1}: no facts extracted (got {type(facts).__name__})")
-        return []
+    # Multi-shot: split the page into small chunks so each LLM call stays light
+    # (bounded VRAM/compute — avoids the spill-to-RAM freeze and GPU TDR). Small
+    # pages are a single shot; dense pages are processed in several. Facts are
+    # de-duplicated across the (overlapping) chunks.
+    chunks = _chunk_text(text, PAGE_EXTRACT_CHUNK_CHARS, overlap=200)
+    facts, seen = [], set()
+    for ch in chunks:
+        for f in _gen(ch):
+            subj = str(f.get("subject") or "").strip()
+            val  = str(f.get("value") or "").strip()
+            if not (subj and val):
+                continue
+            key = (subj.lower(), str(f.get("attribute") or "").strip().lower(), val.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            facts.append(f)
 
-    # Filter out facts with empty value or subject
-    facts = [
-        f for f in facts
-        if f.get("subject") and f.get("value") and str(f.get("value")).strip()
-    ]
-
-    logger.debug(f"Page {page_num + 1}: extracted {len(facts)} facts")
+    logger.debug(f"Page {page_num + 1}: extracted {len(facts)} facts from {len(chunks)} shot(s)")
 
     if write_to_db and facts:
         _write_facts_to_neo4j(facts, doc_id, sector, page_num)

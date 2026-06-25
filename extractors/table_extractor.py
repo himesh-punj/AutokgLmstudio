@@ -238,17 +238,14 @@ def _rasterise_page(pdf_path: Path, page_num: int, dpi: int = PAGE_DPI) -> Optio
     Returns the path to a temporary PNG, or None on failure. page_num is 0-indexed.
     """
     try:
-        pdf = _get_pdf(pdf_path)
-        if page_num >= len(pdf.pages):
+        # Render via PyMuPDF's pixmap (robust + thread-safe per handle). pdfplumber's
+        # page.to_image proved fragile under concurrency ("PDFium: Data format error").
+        doc = _get_fitz(pdf_path)
+        if page_num >= doc.page_count:
             return None
-        page = pdf.pages[page_num]
-        img = page.to_image(resolution=dpi)
+        pix = doc[page_num].get_pixmap(dpi=dpi)
         out = Path(tempfile.mkdtemp()) / f"page-{page_num + 1}.png"
-        img.save(str(out))
-        try:
-            page.flush_cache()
-        except Exception:
-            pass
+        pix.save(str(out))
         return out
     except Exception as e:
         logger.warning(f"Rasterise page {page_num + 1} failed: {e}")
