@@ -41,7 +41,7 @@ from config.backend_settings import (
     LMSTUDIO_TEXT_MODEL, LMSTUDIO_FAST_MODEL,
     LMSTUDIO_TIMEOUT, LMSTUDIO_MAX_RETRIES, LMSTUDIO_MAX_TOKENS,
     USE_THINKING_FOR_VALIDATION, LMSTUDIO_VALIDATION_MODEL,
-    LMSTUDIO_VALIDATION_MAX_TOKENS,
+    LMSTUDIO_VALIDATION_MAX_TOKENS, LMSTUDIO_SEED,
 )
 
 # ─── Model router (mirrors ollama_client.TaskType) ─────────────────────────────
@@ -88,14 +88,18 @@ def _headers() -> dict:
     reraise=True,
 )
 def _chat(messages: list[dict], model: str, temperature: float = 0.1,
-          max_tokens: int = LMSTUDIO_MAX_TOKENS) -> str:
-    """POST /v1/chat/completions and return the assistant message content."""
+          max_tokens: int = LMSTUDIO_MAX_TOKENS, seed: int = "__default__") -> str:
+    """POST /v1/chat/completions and return the assistant message content.
+    seed: pass an int to override; leave default to use LMSTUDIO_SEED; None disables."""
+    eff_seed = LMSTUDIO_SEED if seed == "__default__" else seed
     payload = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
+        # greedy + fixed seed → reproducible judgments (see LMSTUDIO_SEED in backend_settings)
+        **({"seed": eff_seed, "top_p": 1, "top_k": 1} if eff_seed is not None else {}),
     }
     resp = requests.post(
         f"{LMSTUDIO_BASE_URL}/chat/completions",
@@ -111,7 +115,7 @@ def _chat(messages: list[dict], model: str, temperature: float = 0.1,
 # ─── Text generation ───────────────────────────────────────────────────────────
 
 def generate(prompt: str, system: str = "", model: str = None, temperature: float = 0.1,
-             max_tokens: int = None) -> str:
+             max_tokens: int = None, seed: int = "__default__") -> str:
     """Generate a text response from LM Studio. Low temperature for structured extraction.
     max_tokens defaults per-model (the reasoning validation model gets a larger budget)."""
     m = model or LMSTUDIO_TEXT_MODEL
@@ -120,11 +124,12 @@ def generate(prompt: str, system: str = "", model: str = None, temperature: floa
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
     return _chat(messages, model=m, temperature=temperature,
-                 max_tokens=max_tokens or _max_tokens_for_model(m))
+                 max_tokens=max_tokens or _max_tokens_for_model(m), seed=seed)
 
 
 def generate_json(prompt: str, system: str = "", model: str = None,
-                  temperature: float = 0.05, max_tokens: int = None) -> dict | list | None:
+                  temperature: float = 0.05, max_tokens: int = None,
+                  seed: int = "__default__") -> dict | list | None:
     """
     Generate and parse JSON from LM Studio.
     Handles: markdown fences, multiple objects (wraps into array),
@@ -138,7 +143,7 @@ def generate_json(prompt: str, system: str = "", model: str = None,
         "Start your response directly with { or [ as appropriate."
     )
     raw = generate(prompt, system=json_system, model=model, temperature=temperature,
-                   max_tokens=max_tokens)
+                   max_tokens=max_tokens, seed=seed)
     return _extract_json(raw)
 
 

@@ -77,6 +77,21 @@ USE_THINKING_FOR_VALIDATION    = True
 LMSTUDIO_VALIDATION_MODEL      = "qwen3-14b"
 LMSTUDIO_VALIDATION_MAX_TOKENS = 4096   # reasoning eats output tokens before the JSON
 
+# Reproducibility. temperature=0 alone is NOT deterministic on a parallel GPU server —
+# two identical runs flipped 3/21 verdicts and swung the score 90.9%→100%. A fixed seed
+# (+ greedy sampling) makes each judgment reproducible so prompt/rule changes can actually
+# be measured instead of fighting noise. Set LMSTUDIO_SEED=None to restore sampling.
+LMSTUDIO_SEED = 42
+
+# Self-consistency votes per validation judgment. The judge's SEMANTIC fields
+# (applicable / referent pick) are decided by majority over this many samples
+# (seeds LMSTUDIO_SEED..+N-1) — reproducible across runs, robust to the thinking
+# model's residual GPU nondeterminism. The numeric verdict itself is computed in
+# code (validators/quantity.py) and is already deterministic. 1 = no voting.
+# (LM Studio + qwen3 does NOT honor seed reliably — verified — so a few votes are
+# needed to stabilise the majority; the deterministic core keeps the score sound.)
+VALIDATION_VOTES = 5
+
 
 # ─── GLM-OCR vision model (served by Ollama) ───────────────────────────────────
 # Pull the model first, then set GLM_OCR_MODEL to the EXACT tag from `ollama list`:

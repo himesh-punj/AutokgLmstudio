@@ -49,7 +49,8 @@ def get_model_for_task(task: str) -> str:
     retry=retry_if_exception_type(Exception),
     reraise=True
 )
-def generate(prompt: str, system: str = "", model: str = None, temperature: float = 0.1) -> str:
+def generate(prompt: str, system: str = "", model: str = None, temperature: float = 0.1,
+             seed: int = None) -> str:
     """Generate a text response from Ollama. Low temperature for structured extraction."""
     m = model or OLLAMA_TEXT_MODEL
     messages = []
@@ -57,16 +58,15 @@ def generate(prompt: str, system: str = "", model: str = None, temperature: floa
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    response = ollama.chat(
-        model=m,
-        messages=messages,
-        options={"temperature": temperature, "num_ctx": 8192},
-    )
+    options = {"temperature": temperature, "num_ctx": 8192}
+    if seed is not None:
+        options["seed"] = seed
+    response = ollama.chat(model=m, messages=messages, options=options)
     return response["message"]["content"].strip()
 
 
 def generate_json(prompt: str, system: str = "", model: str = None,
-                  temperature: float = 0.05) -> dict | list | None:
+                  temperature: float = 0.05, seed: int = None) -> dict | list | None:
     """
     Generate and parse JSON from Ollama.
     Handles: markdown fences, multiple objects (wraps into array),
@@ -78,7 +78,7 @@ def generate_json(prompt: str, system: str = "", model: str = None,
         "No markdown, no explanation, no preamble. "
         "Start your response directly with { or [ as appropriate."
     )
-    raw = generate(prompt, system=json_system, model=model, temperature=temperature)
+    raw = generate(prompt, system=json_system, model=model, temperature=temperature, seed=seed)
 
     # Strip markdown fences if present
     raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)

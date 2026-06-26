@@ -63,23 +63,30 @@ def main():
         f"[{vc}]{s['verdict']}[/{vc}]   Weighted Compliance: [{vc}]{s['weighted_score']:.1f}%[/{vc}]",
         subtitle=(f"[dim]Compliant {s['compliant']} | Non-Compliant {s['non_compliant']} | "
                   f"N/A {s.get('not_applicable', 0)} | Not Found {s['not_found']} | "
-                  f"Needs Human {s['needs_human']} | Requirements {s['total_requirements']}[/dim]"),
+                  f"Needs Human {s['needs_human']} | [yellow]Review {s.get('low_confidence', 0)}[/yellow] | "
+                  f"Requirements {s['total_requirements']}[/dim]"),
         border_style=vc.replace("bold ", ""),
     ))
 
     t = Table(border_style="cyan", show_lines=False)
-    for col in ("Verdict", "Requirement", "DPR Value", "Expected", "Pg", "Why"):
+    for col in ("Verdict", "Conf", "Requirement", "DPR Value", "Expected", "Pg", "Why"):
         t.add_column(col)
     vcol = {"Compliant": "green", "Non-Compliant": "red", "Not Applicable": "dim",
             "Not Found": "yellow", "Needs Human": "magenta"}
     for r in report["results"]:
+        review = r.get("review")
+        conf = f"[yellow]{r.get('confidence', 0):.0%}⚠[/yellow]" if review else f"{r.get('confidence', 1):.0%}"
+        verdict_cell = f"[{vcol.get(r['verdict'],'white')}]{r['verdict']}[/{vcol.get(r['verdict'],'white')}]"
+        if review:
+            verdict_cell += " [yellow](review)[/yellow]"
         t.add_row(
-            f"[{vcol.get(r['verdict'],'white')}]{r['verdict']}[/{vcol.get(r['verdict'],'white')}]",
+            verdict_cell, conf,
             str(r["check_area"])[:26], str(r["dpr_value"])[:16], str(r["requirement"])[:22],
             str(r["source_page"]), str(r["reason"])[:48],
         )
     console.print(t)
-    console.print(f"\n[green]Report:[/green] output/context_validation_{doc_id}.json")
+    console.print(f"\n[dim]⚠ = low vote-agreement; verdict may vary run-to-run — human review advised.[/dim]")
+    console.print(f"[green]Report:[/green] output/context_validation_{doc_id}.json")
 
 
 if __name__ == "__main__":
