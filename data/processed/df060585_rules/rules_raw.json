@@ -1,0 +1,222 @@
+[
+  {
+    "clause": "",
+    "rule_text": "Check if curves comply with minimum radius requirements for speeds of 160 km/hr and 130 kmph",
+    "attribute": "curve radius",
+    "operator": ">=",
+    "threshold": "1.3",
+    "unit": "Degree",
+    "condition": "speed 160 kmph",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check if curves comply with minimum radius requirements for speeds of 160 km/hr and 130 kmph",
+    "attribute": "curve radius",
+    "operator": ">=",
+    "threshold": "2.2",
+    "unit": "Degree",
+    "condition": "speed 130 kmph",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check whether vertical gradients are within permissible limits",
+    "attribute": "ruling gradient",
+    "operator": "<=",
+    "threshold": "1:100",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check whether vertical gradients are within permissible limits",
+    "attribute": "approach to river gradient",
+    "operator": "<=",
+    "threshold": "1:150",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check whether vertical gradients are within permissible limits",
+    "attribute": "station/yards gradient",
+    "operator": "<=",
+    "threshold": "1:1200",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the design speed provided in DPR",
+    "attribute": "design speed",
+    "operator": "==",
+    "threshold": "160 kmph",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Compare Route Km and Track Km to ensure consistency",
+    "attribute": "track_km_ratio",
+    "operator": "<=",
+    "threshold": "2.4",
+    "unit": "",
+    "condition": "3rd and 4th line",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Compare Route Km and Track Km to ensure consistency",
+    "attribute": "track_km_ratio",
+    "operator": "<=",
+    "threshold": "1.2",
+    "unit": "",
+    "condition": "doubling project",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check whether loading standards are within permissible levels",
+    "attribute": "design axle load",
+    "operator": "==",
+    "threshold": "25 tons",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the minimum formation width as per standards",
+    "attribute": "formation width",
+    "operator": ">=",
+    "threshold": "7.85",
+    "unit": "m",
+    "condition": "single line",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the minimum formation width as per standards",
+    "attribute": "formation width",
+    "operator": ">=",
+    "threshold": "13.15",
+    "unit": "m",
+    "condition": "double line",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the minimum track centre spacing between lines",
+    "attribute": "track centre spacing",
+    "operator": "in_range",
+    "threshold": "7.8",
+    "unit": "m",
+    "condition": "3rd line",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the minimum track centre spacing between lines",
+    "attribute": "track centre spacing",
+    "operator": "in_range",
+    "threshold": "5.3",
+    "unit": "m",
+    "condition": "4th line from 3rd line",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Verify loading standards for bridge sub-structure and super-structure",
+    "attribute": "sub-structure loading",
+    "operator": "==",
+    "threshold": "25T",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Verify loading standards for bridge sub-structure and super-structure",
+    "attribute": "super-structure loading",
+    "operator": "==",
+    "threshold": "25T",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the number of SPs per Route Km",
+    "attribute": "SPs per route km",
+    "operator": "==",
+    "threshold": "1",
+    "unit": "per 50 km",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the number of SSPs per Route Km",
+    "attribute": "SSPs per route km",
+    "operator": "==",
+    "threshold": "2",
+    "unit": "per 50 km",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the number of TSSs per Route Km",
+    "attribute": "TSSs per route km",
+    "operator": "==",
+    "threshold": "1",
+    "unit": "per 50 km",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check the number of tower wagons/cars and sheds provided",
+    "attribute": "tower wagon per route km",
+    "operator": "==",
+    "threshold": "1",
+    "unit": "per 50 Route Km or 100 Track Km",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  },
+  {
+    "clause": "",
+    "rule_text": "Check Remote Terminal Unit count to determine if a new SCADA system is required",
+    "attribute": "remote terminal units",
+    "operator": ">=",
+    "threshold": "50",
+    "unit": "",
+    "condition": "",
+    "doc_id": "df060585_rules",
+    "source_page": 1
+  }
+]
