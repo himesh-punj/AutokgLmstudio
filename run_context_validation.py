@@ -23,6 +23,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.neo4j_client import init_schema, run_read
 from config.settings import NodeLabel
+from config.backend_settings import (
+    LMSTUDIO_VALIDATION_MODEL, LMSTUDIO_TEXT_MODEL, USE_THINKING_FOR_VALIDATION,
+)
+from utils.model_manager import ensure_loaded
 from validators.context_validator import run_context_validation
 
 console = Console()
@@ -51,6 +55,11 @@ def main():
     doc_id, sector = _resolve(args.doc_id, args.sector)
     if not doc_id:
         console.print("[red]No --doc-id and none in state file.[/red]"); sys.exit(1)
+
+    # Swap LM Studio to the reasoning model on GPU (unloads the extraction text model).
+    val_model = LMSTUDIO_VALIDATION_MODEL if USE_THINKING_FOR_VALIDATION else LMSTUDIO_TEXT_MODEL
+    console.print(f"[dim]Ensuring validation model '{val_model}' is loaded on GPU…[/dim]")
+    ensure_loaded(val_model)
 
     console.rule(f"[bold]Context-aware validation — {sector}[/bold]")
     console.print(f"[dim]doc-id={doc_id} — retrieving DPR context per requirement and judging with Qwen...[/dim]")

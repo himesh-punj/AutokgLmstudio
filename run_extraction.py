@@ -47,7 +47,9 @@ from config.settings import (
     DPR_START_PAGE, DPR_MAX_PAGES, RULEBOOK_START_PAGE, RULEBOOK_MAX_PAGES,
     EXTRACTION_WORKERS,
 )
+from config.backend_settings import LMSTUDIO_TEXT_MODEL
 from utils.llm_router import classify_sector, vision_describe_image
+from utils.model_manager import ensure_loaded
 from extractors.document_loader import load_document
 from extractors.table_extractor import extract_tables_from_page
 from extractors.fact_extractor import extract_facts_from_page
@@ -252,6 +254,10 @@ def extract_dpr(
     console.rule(f"[bold]DPR: {dpr_path.name}[/bold]")
     console.print(f"   Start page: {start}  |  Max pages: {max_p or 'all'}  |  Workers: {n_workers}")
 
+    # Phase 1 (facts) runs on the text model — ensure it's loaded on GPU. Phase 2 frees
+    # VRAM for vision OCR itself (_free_vram_for_vision), so only the start needs this.
+    ensure_loaded(LMSTUDIO_TEXT_MODEL, parallel=n_workers)
+
     doc = load_document(dpr_path, doc_id)
 
     # Sector classification
@@ -381,6 +387,9 @@ def extract_rulebook(
     n_workers = workers    if workers    is not None else EXTRACTION_WORKERS
 
     console.rule(f"[bold]Rulebook: {rb_path.name}[/bold]")
+
+    # Rule extraction runs on the text model — ensure it's loaded on GPU.
+    ensure_loaded(LMSTUDIO_TEXT_MODEL, parallel=n_workers)
 
     doc = load_document(rb_path, doc_id)
     standard_name = standard_name or detect_standard_name(doc.raw_text[:3000])

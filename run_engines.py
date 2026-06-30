@@ -41,8 +41,10 @@ from rich import print as rprint
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.settings import NodeLabel, Severity
+from config.settings import NodeLabel, Severity, EXTRACTION_WORKERS
+from config.backend_settings import LMSTUDIO_TEXT_MODEL
 from utils.neo4j_client import init_schema, run_read
+from utils.model_manager import ensure_loaded
 from engines.consistency_engine import run_consistency_engine
 from engines.anomaly_engine import run_anomaly_engine
 
@@ -139,6 +141,9 @@ def main():
     if not doc_id:
         console.print("[red]--doc-id is required[/red]")
         sys.exit(1)
+
+    # Engines use the text model (consistency/anomaly LLM checks) — ensure it's on GPU.
+    ensure_loaded(LMSTUDIO_TEXT_MODEL, parallel=EXTRACTION_WORKERS)
 
     # Connect to Neo4j
     console.print("🔌 Connecting to Neo4j...")

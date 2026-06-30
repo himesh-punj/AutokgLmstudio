@@ -93,6 +93,20 @@ LMSTUDIO_SEED = 42
 VALIDATION_VOTES = 5
 
 
+# ─── Automated model management (load/unload with GPU offload per stage) ───────
+# When True, the run_* scripts load the correct LM Studio model on GPU for each
+# stage and unload the previous one first — extraction/engines use the text model
+# (Qwen2.5), validation uses the reasoning model (Qwen3). Two 14B models don't
+# co-fit on a 12 GB GPU, so switching unloads the other. --gpu max is ALWAYS used
+# because LM Studio otherwise sometimes loads to CPU (~9x slower). Set False to
+# manage models yourself with `lms load`.
+AUTO_MANAGE_MODELS     = True
+LMSTUDIO_LMS_PATH      = None      # None → auto-detect ~/.lmstudio/bin/lms.exe, else "lms"
+LMSTUDIO_GPU_OFFLOAD   = "max"     # --gpu value: "max" | "<n layers>" | "off"
+LMSTUDIO_LOAD_CTX      = 12288     # context length to load models with
+LMSTUDIO_LOAD_PARALLEL = 3         # --parallel; keep >= EXTRACTION_WORKERS (config/settings.py)
+
+
 # ─── GLM-OCR vision model (served by Ollama) ───────────────────────────────────
 # Pull the model first, then set GLM_OCR_MODEL to the EXACT tag from `ollama list`:
 #     ollama pull <glm-ocr-tag>

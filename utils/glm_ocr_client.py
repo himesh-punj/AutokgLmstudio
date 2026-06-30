@@ -69,10 +69,62 @@ def vision_extract(image_path: Path, prompt: str, model: str = None) -> str:
 
 # ─── Table extraction ──────────────────────────────────────────────────────────
 
+def _rows_from_raw(raw: str) -> list[dict] | None:
+    """Best-effort recovery of a JSON array of row objects from a messy OCR string.
+    Multi-strategy (mirrors the text clients) so a minor format slip no longer drops
+    the whole table: strip reasoning/fences → direct parse → array slice → json_repair."""
+    if not raw:
+        return None
+    # drop any <think>…</think> and markdown fences
+    if "</think>" in raw:
+        raw = raw.rsplit("</think>", 1)[1]
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
+    raw = re.sub(r"\s*```$", "", raw, flags=re.MULTILINE).strip()
+
+    def _aslist(obj):
+        if isinstance(obj, list):
+            return [r for r in obj if isinstance(r, dict)] or None
+        if isinstance(obj, dict):
+            # sometimes wrapped as {"rows": [...]} or a single row object
+            for v in obj.values():
+                if isinstance(v, list) and v and isinstance(v[0], dict):
+                    return v
+            return [obj]
+        return None
+
+    # 1) direct
+    try:
+        r = _aslist(json.loads(raw))
+        if r:
+            return r
+    except json.JSONDecodeError:
+        pass
+    # 2) first [...] slice
+    m = re.search(r"\[.*\]", raw, re.DOTALL)
+    if m:
+        try:
+            r = _aslist(json.loads(m.group(0)))
+            if r:
+                return r
+        except json.JSONDecodeError:
+            pass
+    # 3) json_repair (truncated / trailing-comma / unquoted)
+    try:
+        import json_repair
+        r = _aslist(json_repair.loads(raw))
+        if r:
+            return r
+    except Exception:
+        pass
+    return None
+
+
 def vision_extract_table_json(image_path: Path, context: str = "") -> list[dict] | None:
     """
     OCR a table from an image and return it as a list of row dicts.
-    Used as the final fallback when pdfplumber and camelot both fail.
+    Used as the final fallback when pdfplumber and camelot both fail. Never raises —
+    a hard vision failure or unparseable output returns None so one bad page is skipped,
+    not retried noisily or propagated.
     """
     prompt = (
         f"{'Context: ' + context + chr(10) if context else ''}"
@@ -83,20 +135,17 @@ def vision_extract_table_json(image_path: Path, context: str = "") -> list[dict]
         "If a cell is empty, use null. "
         "Do not add any explanation. Start directly with [."
     )
-    raw = vision_extract(image_path, prompt)
+    try:
+        raw = vision_extract(image_path, prompt)
+    except Exception as e:
+        logger.warning(f"[GLM-OCR] vision call failed for {Path(image_path).name}: {e}")
+        return None
 
-    # Strip fences
-    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
-    raw = re.sub(r"\s*```$", "", raw, flags=re.MULTILINE).strip()
-
-    match = re.search(r"\[.*\]", raw, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            logger.warning("[GLM-OCR] table extraction: JSON parse failed")
-            return None
-    return None
+    rows = _rows_from_raw(raw)
+    if rows is None:
+        logger.warning(f"[GLM-OCR] table JSON unparseable for {Path(image_path).name} "
+                       f"(snippet: {(raw or '')[:120]!r}) — page skipped")
+    return rows
 
 
 # ─── Image description ─────────────────────────────────────────────────────────
